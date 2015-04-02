@@ -1,0 +1,54 @@
+plugins {
+  id 'org.hidetake.ssh' version '1.1.1'
+}
+
+apply plugin: 'java'
+apply plugin: 'war'
+apply plugin: 'jetty'
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    compile group: 'commons-io', name: 'commons-io', version: '1.4'
+    compile group: 'log4j', name: 'log4j', version: '1.2.15', ext: 'jar'
+}
+
+httpPort = 9090
+stopPort = 9451
+stopKey = 'foo'
+
+ssh.settings {
+  knownHosts = allowAnyHosts
+}
+
+remotes {
+  ec2 {
+    host = 'ec2-54-186-26-94.us-west-2.compute.amazonaws.com'
+    user = 'bitnami'
+    identity = file('desenvolvimento_aws.pem')
+  }
+}
+
+task deploy(type: SshTask, dependsOn: 'war') {
+  def tomcatHome = '/opt/bitnami/apache-tomcat/webapps'
+  def warName = "gradleHello"
+
+  ssh.run {
+    session(remotes.ec2) {
+        println "Enviado o war"
+        put(war.archivePath.absolutePath,".")
+        
+        try {
+          println "Removendo o war antigo"
+          execute("sudo rm ${tomcatHome}/${warName}.war")
+        } catch (Exception ex) {
+          println "Nao ha arquivo para remover"
+        }
+          
+        println "Ativando o war"
+        execute("sudo mv ~/${warName}.war ${tomcatHome}/")
+    }
+  }
+}
